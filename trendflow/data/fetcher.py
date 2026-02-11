@@ -1,17 +1,19 @@
 import yfinance as yf
 import pandas as pd
 
-def get_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
+def fetch_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
-    Downloads historical stock data from Yahoo Finance.
+    Fetches historical stock data.
 
     Args:
-        ticker (str): The stock ticker symbol.
-        start_date (str): The start date in 'YYYY-MM-DD' format.
-        end_date (str): The end date in 'YYYY-MM-DD' format.
+        ticker: The stock ticker symbol.
+        start_date: The start date in YYYY-MM-DD format.
+        end_date: The end date in YYYY-MM-DD format.
 
     Returns:
-        pd.DataFrame: A pandas DataFrame with the OHLCV data.
+        A pandas DataFrame with OHLCV data.
     """
     data = yf.download(ticker, start=start_date, end=end_date)
+    # Ensure column names are lowercase
+    data.columns = [col.lower() for col in data.columns]
     return data
