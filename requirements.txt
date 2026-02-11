@@ -1,7 +1,5 @@
 pandas
 numpy
-ccxt
 yfinance
 plotly
 streamlit
-pydantic
