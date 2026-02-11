@@ -1,0 +1,2 @@
+# awesome_trading
+TrendFlow 
