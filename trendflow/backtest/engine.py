@@ -1,47 +1,50 @@
 import pandas as pd
 import numpy as np
 
-def run_backtest(initial_capital: float, data: pd.DataFrame, signals: pd.DataFrame):
+class Backtester:
     """
-    Runs a simple backtest on a trading strategy.
-
-    Args:
-        initial_capital (float): The initial capital for the backtest.
-        data (pd.DataFrame): A pandas DataFrame with OHLCV data.
-        signals (pd.DataFrame): A pandas DataFrame with trading signals.
-
-    Returns:
-        dict: A dictionary with backtesting performance metrics.
+    A vectorized backtesting engine.
     """
-    positions = pd.DataFrame(index=signals.index).fillna(0.0)
-    positions['Stock'] = 100 * signals['signal']   # This is where we make an assumption of 100 shares per trade
 
-    portfolio = positions.multiply(data['Close'], axis=0)
-    pos_diff = positions.diff()
+    def run(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Runs the backtest.
 
-    portfolio['holdings'] = (positions.multiply(data['Close'], axis=0)).sum(axis=1)
-    portfolio['cash'] = initial_capital - (pos_diff.multiply(data['Close'], axis=0)).sum(axis=1).cumsum()
+        Args:
+            data: DataFrame with 'close' and 'signal' columns.
 
-    portfolio['total'] = portfolio['cash'] + portfolio['holdings']
-    portfolio['returns'] = portfolio['total'].pct_change()
-    
-    # Calculate performance metrics
-    total_return = (portfolio['total'][-1] / portfolio['total'][0]) - 1
-    
-    trades = signals['positions'][signals['positions'] != 0]
-    num_trades = len(trades)
-    
-    wins = trades[trades > 0]
-    losses = trades[trades < 0]
-    num_wins = len(wins)
-    num_losses = len(losses)
-    win_rate = (num_wins / num_trades) * 100 if num_trades > 0 else 0
-    
-    return {
-        "portfolio": portfolio,
-        "total_return": total_return,
-        "num_trades": num_trades,
-        "num_wins": num_wins,
-        "num_losses": num_losses,
-        "win_rate": win_rate
-    }
+        Returns:
+            DataFrame with 'returns', 'strategy_returns', and 'equity_curve' columns.
+        """
+        data['returns'] = data['close'].pct_change()
+        data['strategy_returns'] = data['returns'] * data['signal'].shift(1)
+        data['equity_curve'] = (1 + data['strategy_returns']).cumprod()
+        return data
+
+    def calculate_metrics(self, data: pd.DataFrame) -> dict:
+        """
+        Calculates performance metrics.
+
+        Args:
+            data: DataFrame with 'strategy_returns' and 'equity_curve' columns.
+
+        Returns:
+            A dictionary with performance metrics.
+        """
+        total_return = data['equity_curve'].iloc[-1] - 1
+        
+        # Max Drawdown
+        previous_peaks = data['equity_curve'].cummax()
+        drawdown = (data['equity_curve'] - previous_peaks) / previous_peaks
+        max_drawdown = drawdown.min()
+
+        # Win Rate
+        winning_trades = (data['strategy_returns'] > 0).sum()
+        total_trades = (data['signal'] != 0).sum()
+        win_rate = winning_trades / total_trades if total_trades > 0 else 0
+
+        return {
+            'Total Return': f"{total_return:.2%}",
+            'Max Drawdown': f"{max_drawdown:.2%}",
+            'Win Rate': f"{win_rate:.2%}"
+        }
