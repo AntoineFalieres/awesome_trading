@@ -1,13 +1,11 @@
 import pandas as pd
+import numpy as np
 from trendflow.indicators.base import Indicator
 
 class VolumeStats(Indicator):
     """
     Calculates volume moving average and the ratio of current volume to the moving average.
     """
-
-    def __init__(self, period: int = 30):
-        self.period = period
 
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -22,11 +20,14 @@ class VolumeStats(Indicator):
         if 'volume' not in data.columns:
             raise ValueError("Data must have a 'volume' column")
 
-        vol_ma_col = f'vol_ma_{self.period}'
-        data[vol_ma_col] = data['volume'].rolling(window=self.period).mean()
+        period = 30
+        data['vol_ma'] = data['volume'].rolling(window=period).mean()
         
         # Handle division by zero
-        data['vol_ratio'] = (data['volume'] / data[vol_ma_col]).fillna(0)
-        data['vol_ratio'].replace([float('inf'), -float('inf')], 0, inplace=True)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            data['vol_ratio'] = (data['volume'] / data['vol_ma'])
+        
+        data['vol_ratio'].replace([np.inf, -np.inf], np.nan, inplace=True)
+        data['vol_ratio'].fillna(0, inplace=True)
         
         return data
