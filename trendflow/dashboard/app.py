@@ -52,52 +52,51 @@ def run_backtest(ticker, start_date, end_date, sl_pct, tp_pct, use_trend_filter,
     return results, metrics
 
 # --- Main App ---
-if st.sidebar.button("Run Backtest"):
-    results_df, metrics = run_backtest(ticker, start_date, end_date, sl_pct, tp_pct, use_trend_filter, long_ma_period, long_ma_type)
+results_df, metrics = run_backtest(ticker, start_date, end_date, sl_pct, tp_pct, use_trend_filter, long_ma_period, long_ma_type)
 
-    st.subheader("Performance Metrics")
-    st.json(metrics)
+st.subheader("Performance Metrics")
+st.json(metrics)
 
-    st.subheader("Equity Curve")
-    st.line_chart(results_df['equity_curve'])
+st.subheader("Equity Curve")
+st.line_chart(results_df['equity_curve'])
 
-    st.subheader("Price Chart & Signals")
+st.subheader("Price Chart & Signals")
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=[0.7, 0.3])
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=[0.7, 0.3])
 
-    # Price Chart
-    fig.add_trace(go.Candlestick(x=results_df.index,
-                               open=results_df['open'],
-                               high=results_df['high'],
-                               low=results_df['low'],
-                               close=results_df['close'],
-                               name='Price'), row=1, col=1)
+# Price Chart
+fig.add_trace(go.Candlestick(x=results_df.index,
+                           open=results_df['open'],
+                           high=results_df['high'],
+                           low=results_df['low'],
+                           close=results_df['close'],
+                           name='Price'), row=1, col=1)
 
-    # MM30
-    fig.add_trace(go.Scatter(x=results_df.index, y=results_df['MM30'], mode='lines', name='MM30', line=dict(color='orange')), row=1, col=1)
+# MM30
+fig.add_trace(go.Scatter(x=results_df.index, y=results_df['MM30'], mode='lines', name='MM30', line=dict(color='orange')), row=1, col=1)
 
-    # Secondary MA
-    if show_secondary_ma:
-        ma_indicator = MovingAverage(period=sec_ma_period, ma_type=sec_ma_type)
-        results_df = ma_indicator.calculate(results_df)
-        sec_ma_col = f"{sec_ma_type.upper()}_{sec_ma_period}"
-        fig.add_trace(go.Scatter(x=results_df.index, y=results_df[sec_ma_col], mode='lines', name=f'Secondary MA ({sec_ma_col})'), row=1, col=1)
+# Secondary MA
+if show_secondary_ma:
+    ma_indicator = MovingAverage(period=sec_ma_period, ma_type=sec_ma_type)
+    results_df = ma_indicator.calculate(results_df)
+    sec_ma_col = f"{sec_ma_type.upper()}_{sec_ma_period}"
+    fig.add_trace(go.Scatter(x=results_df.index, y=results_df[sec_ma_col], mode='lines', name=f'Secondary MA ({sec_ma_col})'), row=1, col=1)
 
-    # Buy Signals
-    buy_signals = results_df[results_df['signal'] == 1]
-    fig.add_trace(go.Scatter(x=buy_signals.index, y=buy_signals['close'], mode='markers', name='Buy Signal',
-                               marker=dict(symbol='triangle-up', color='green', size=10)), row=1, col=1)
+# Buy Signals
+buy_signals = results_df[results_df['signal'] == 1]
+fig.add_trace(go.Scatter(x=buy_signals.index, y=buy_signals['close'], mode='markers', name='Buy Signal',
+                           marker=dict(symbol='triangle-up', color='green', size=10)), row=1, col=1)
 
-    # Sell Signals
-    sell_signals = results_df[results_df['signal'] == -1]
-    fig.add_trace(go.Scatter(x=sell_signals.index, y=sell_signals['close'], mode='markers', name='Sell Signal',
-                               marker=dict(symbol='triangle-down', color='red', size=10)), row=1, col=1)
+# Sell Signals
+sell_signals = results_df[results_df['signal'] == -1]
+fig.add_trace(go.Scatter(x=sell_signals.index, y=sell_signals['close'], mode='markers', name='Sell Signal',
+                           marker=dict(symbol='triangle-down', color='red', size=10)), row=1, col=1)
 
-    # Volume Chart
-    fig.add_trace(go.Bar(x=results_df.index, y=results_df['volume'], name='Volume'), row=2, col=1)
-    
-    fig.update_layout(xaxis_rangeslider_visible=False, height=800)
-    st.plotly_chart(fig, use_container_width=True)
+# Volume Chart
+fig.add_trace(go.Bar(x=results_df.index, y=results_df['volume'], name='Volume'), row=2, col=1)
 
-    st.subheader("Trade Log")
-    st.dataframe(results_df[results_df['signal'] != 0])
+fig.update_layout(xaxis_rangeslider_visible=False, height=800)
+st.plotly_chart(fig, use_container_width=True)
+
+st.subheader("Trade Log")
+st.dataframe(results_df[results_df['signal'] != 0])

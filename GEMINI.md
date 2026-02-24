@@ -9,7 +9,7 @@ This document defines the identity, knowledge, and rules of engagement for the G
 **Project Overview:** This project is a Python package that aims to calculate the right point point to trade stocks or crypto.
 
 **Architecture:**
-*   **Python Package:** This is a standard Python package, installable via `pip` or `uv`.
+*   **Python Package:** This is a standard Python package, installable via `uv`.
 
 **Technology Stack:**
 *   **Language:** Python 3

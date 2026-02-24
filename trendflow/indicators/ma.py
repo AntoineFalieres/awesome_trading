@@ -7,6 +7,7 @@ class MovingAverage(Indicator):
     """
 
     def __init__(self, period: int, ma_type: str = 'sma'):
+        print(f"MovingAverage.__init__: ma_type='{ma_type}', type={type(ma_type)}")
         if ma_type not in ['sma', 'ema', 'wma']:
             raise ValueError("ma_type must be one of 'sma', 'ema', or 'wma'")
         self.period = period
