@@ -51,8 +51,12 @@ class Strategy:
                  start_date: str,
                  end_date: str,
                  indicators: List[Dict[str, Any]],
-                 entry_conditions: List[Dict[str, Any]],
-                 exit_conditions: List[Dict[str, Any]],
+                 entry_conditions: Optional[List[Dict[str, Any]]] = None,
+                 exit_conditions: Optional[List[Dict[str, Any]]] = None,
+                 long_entry_conditions: Optional[List[Dict[str, Any]]] = None,
+                 long_exit_conditions: Optional[List[Dict[str, Any]]] = None,
+                 short_entry_conditions: Optional[List[Dict[str, Any]]] = None,
+                 short_exit_conditions: Optional[List[Dict[str, Any]]] = None,
                  description: str = "",
                  backtest_params: Optional[Dict[str, Any]] = None):
         """
@@ -64,8 +68,12 @@ class Strategy:
             start_date: Start date (YYYY-MM-DD)
             end_date: End date (YYYY-MM-DD)
             indicators: List of indicator configurations
-            entry_conditions: List of entry condition configurations
-            exit_conditions: List of exit condition configurations
+            entry_conditions: Legacy long entry conditions (backward compatibility)
+            exit_conditions: Legacy long exit conditions (backward compatibility)
+            long_entry_conditions: Long entry condition configurations
+            long_exit_conditions: Long exit condition configurations
+            short_entry_conditions: Short entry condition configurations
+            short_exit_conditions: Short exit condition configurations
             description: Strategy description
             backtest_params: Backtest parameters (initial_capital, commission)
         """
@@ -76,10 +84,38 @@ class Strategy:
         self.description = description
         self.indicators = [IndicatorConfig.from_dict(ind) if isinstance(ind, dict) else ind 
                           for ind in indicators]
-        self.entry_conditions = [ConditionConfig.from_dict(cond) if isinstance(cond, dict) else cond 
-                                for cond in entry_conditions]
-        self.exit_conditions = [ConditionConfig.from_dict(cond) if isinstance(cond, dict) else cond 
-                               for cond in exit_conditions]
+
+        legacy_entry_conditions = entry_conditions or []
+        legacy_exit_conditions = exit_conditions or []
+        resolved_long_entry_conditions = (
+            long_entry_conditions if long_entry_conditions is not None else legacy_entry_conditions
+        )
+        resolved_long_exit_conditions = (
+            long_exit_conditions if long_exit_conditions is not None else legacy_exit_conditions
+        )
+        resolved_short_entry_conditions = short_entry_conditions or []
+        resolved_short_exit_conditions = short_exit_conditions or []
+
+        self.long_entry_conditions = [
+            ConditionConfig.from_dict(cond) if isinstance(cond, dict) else cond
+            for cond in resolved_long_entry_conditions
+        ]
+        self.long_exit_conditions = [
+            ConditionConfig.from_dict(cond) if isinstance(cond, dict) else cond
+            for cond in resolved_long_exit_conditions
+        ]
+        self.short_entry_conditions = [
+            ConditionConfig.from_dict(cond) if isinstance(cond, dict) else cond
+            for cond in resolved_short_entry_conditions
+        ]
+        self.short_exit_conditions = [
+            ConditionConfig.from_dict(cond) if isinstance(cond, dict) else cond
+            for cond in resolved_short_exit_conditions
+        ]
+
+        # Backward compatibility aliases
+        self.entry_conditions = self.long_entry_conditions
+        self.exit_conditions = self.long_exit_conditions
         self.backtest_params = backtest_params or {'initial_capital': 10000, 'commission': 0.001}
 
     @classmethod
@@ -93,6 +129,10 @@ class Strategy:
             indicators=data.get('indicators', []),
             entry_conditions=data.get('entry_conditions', []),
             exit_conditions=data.get('exit_conditions', []),
+            long_entry_conditions=data.get('long_entry_conditions', None),
+            long_exit_conditions=data.get('long_exit_conditions', None),
+            short_entry_conditions=data.get('short_entry_conditions', []),
+            short_exit_conditions=data.get('short_exit_conditions', []),
             description=data.get('description', ''),
             backtest_params=data.get('backtest_params', None)
         )
@@ -113,10 +153,18 @@ class Strategy:
             'description': self.description,
             'indicators': [ind.to_dict() if hasattr(ind, 'to_dict') else ind 
                           for ind in self.indicators],
-            'entry_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond 
-                                for cond in self.entry_conditions],
-            'exit_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond 
-                               for cond in self.exit_conditions],
+            'entry_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond
+                                 for cond in self.long_entry_conditions],
+            'exit_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond
+                                for cond in self.long_exit_conditions],
+            'long_entry_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond
+                                      for cond in self.long_entry_conditions],
+            'long_exit_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond
+                                     for cond in self.long_exit_conditions],
+            'short_entry_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond
+                                       for cond in self.short_entry_conditions],
+            'short_exit_conditions': [cond.to_dict() if hasattr(cond, 'to_dict') else cond
+                                      for cond in self.short_exit_conditions],
             'backtest_params': self.backtest_params
         }
 
@@ -143,33 +191,41 @@ class Strategy:
             errors.append("Strategy must have an end_date")
         if len(self.indicators) == 0:
             errors.append("Strategy must have at least one indicator")
-        if len(self.entry_conditions) == 0:
-            errors.append("Strategy must have at least one entry condition")
-        if len(self.exit_conditions) == 0:
-            errors.append("Strategy must have at least one exit condition")
+        total_entries = len(self.long_entry_conditions) + len(self.short_entry_conditions)
+        total_exits = len(self.long_exit_conditions) + len(self.short_exit_conditions)
+        if total_entries == 0:
+            errors.append("Strategy must have at least one entry condition (long or short)")
+        if total_exits == 0:
+            errors.append("Strategy must have at least one exit condition (long or short)")
+
+        if self.long_entry_conditions and not self.long_exit_conditions:
+            errors.append("Long strategies require at least one long exit condition")
+        if self.short_entry_conditions and not self.short_exit_conditions:
+            errors.append("Short strategies require at least one short exit condition")
+        if self.long_exit_conditions and not self.long_entry_conditions:
+            errors.append("Long exit conditions require at least one long entry condition")
+        if self.short_exit_conditions and not self.short_entry_conditions:
+            errors.append("Short exit conditions require at least one short entry condition")
 
         # Validate indicator references in conditions
         indicator_names = {ind.name for ind in self.indicators}
-        
-        for i, cond in enumerate(self.entry_conditions):
-            if cond.type in ('crossover', 'crossunder'):
-                if cond.fast_indicator and cond.fast_indicator not in indicator_names:
-                    errors.append(f"Entry condition {i}: indicator '{cond.fast_indicator}' not found")
-                if cond.slow_indicator and cond.slow_indicator not in indicator_names:
-                    errors.append(f"Entry condition {i}: indicator '{cond.slow_indicator}' not found")
-            elif cond.type == 'threshold':
-                if cond.indicator and cond.indicator not in indicator_names:
-                    errors.append(f"Entry condition {i}: indicator '{cond.indicator}' not found")
 
-        for i, cond in enumerate(self.exit_conditions):
-            if cond.type in ('crossover', 'crossunder'):
-                if cond.fast_indicator and cond.fast_indicator not in indicator_names:
-                    errors.append(f"Exit condition {i}: indicator '{cond.fast_indicator}' not found")
-                if cond.slow_indicator and cond.slow_indicator not in indicator_names:
-                    errors.append(f"Exit condition {i}: indicator '{cond.slow_indicator}' not found")
-            elif cond.type == 'threshold':
-                if cond.indicator and cond.indicator not in indicator_names:
-                    errors.append(f"Exit condition {i}: indicator '{cond.indicator}' not found")
+        condition_sets = [
+            ("Long entry", self.long_entry_conditions),
+            ("Long exit", self.long_exit_conditions),
+            ("Short entry", self.short_entry_conditions),
+            ("Short exit", self.short_exit_conditions),
+        ]
+        for label, conditions in condition_sets:
+            for i, cond in enumerate(conditions):
+                if cond.type in ('crossover', 'crossunder'):
+                    if cond.fast_indicator and cond.fast_indicator not in indicator_names:
+                        errors.append(f"{label} condition {i}: indicator '{cond.fast_indicator}' not found")
+                    if cond.slow_indicator and cond.slow_indicator not in indicator_names:
+                        errors.append(f"{label} condition {i}: indicator '{cond.slow_indicator}' not found")
+                elif cond.type == 'threshold':
+                    if cond.indicator and cond.indicator not in indicator_names:
+                        errors.append(f"{label} condition {i}: indicator '{cond.indicator}' not found")
 
         return errors
 

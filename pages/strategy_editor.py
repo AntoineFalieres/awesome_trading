@@ -25,6 +25,78 @@ def show_editor():
         show_load_strategy(manager)
 
 
+def build_conditions_section(
+    section_title: str,
+    section_key: str,
+    indicator_names,
+    default_count: int
+):
+    """Render a reusable condition builder section."""
+    st.subheader(section_title)
+    conditions = []
+    num_conditions = st.number_input(
+        f"Number of {section_title}",
+        min_value=0,
+        max_value=5,
+        value=default_count,
+        step=1,
+        key=f"{section_key}_count"
+    )
+
+    for i in range(int(num_conditions)):
+        with st.expander(f"{section_title} {i+1}", expanded=(i == 0)):
+            cond_type = st.selectbox(
+                f"{section_title} {i+1} Type",
+                ["crossover", "crossunder", "threshold"],
+                key=f"{section_key}_type_{i}"
+            )
+
+            cond = {"type": cond_type}
+            if not indicator_names:
+                st.warning("Add at least one indicator before configuring conditions.")
+                continue
+
+            if cond_type in ("crossover", "crossunder"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    cond["fast_indicator"] = st.selectbox(
+                        f"Fast Indicator {i+1}",
+                        indicator_names,
+                        key=f"{section_key}_fast_{i}"
+                    )
+                with col2:
+                    cond["slow_indicator"] = st.selectbox(
+                        f"Slow Indicator {i+1}",
+                        indicator_names,
+                        key=f"{section_key}_slow_{i}"
+                    )
+
+            elif cond_type == "threshold":
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    cond["indicator"] = st.selectbox(
+                        f"Indicator {i+1}",
+                        indicator_names,
+                        key=f"{section_key}_indicator_{i}"
+                    )
+                with col2:
+                    cond["comparison"] = st.selectbox(
+                        f"Comparison {i+1}",
+                        ["above", "below", "above_or_equal", "below_or_equal"],
+                        key=f"{section_key}_comparison_{i}"
+                    )
+                with col3:
+                    cond["value"] = st.number_input(
+                        f"Value {i+1}",
+                        value=50.0,
+                        key=f"{section_key}_value_{i}"
+                    )
+
+            conditions.append(cond)
+
+    return conditions
+
+
 def show_create_strategy(manager):
     """Show form to create a new strategy."""
     st.subheader("Create New Strategy")
@@ -69,7 +141,7 @@ def show_create_strategy(manager):
         st.subheader("📊 Indicators")
         
         indicators = []
-        num_indicators = st.number_input("Number of Indicators", min_value=1, max_value=5, value=1)
+        num_indicators = st.number_input("Number of Indicators", min_value=1, value=1, step=1)
         
         for i in range(int(num_indicators)):
             with st.expander(f"Indicator {i+1}", expanded=(i==0)):
@@ -123,117 +195,38 @@ def show_create_strategy(manager):
         
         st.divider()
         
-        # Entry Conditions
-        st.subheader("📈 Entry Conditions")
-        entry_conditions = []
-        num_entries = st.number_input("Number of Entry Conditions", min_value=1, max_value=3, value=1)
-        
         indicator_names = [ind["name"] for ind in indicators]
-        
-        for i in range(int(num_entries)):
-            with st.expander(f"Entry Condition {i+1}", expanded=(i==0)):
-                cond_type = st.selectbox(
-                    f"Condition {i+1} Type",
-                    ["crossover", "crossunder", "threshold"],
-                    key=f"entry_cond_type_{i}"
-                )
-                
-                cond = {"type": cond_type}
-                
-                if cond_type == "crossover" or cond_type == "crossunder":
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        cond["fast_indicator"] = st.selectbox(
-                            f"Fast Indicator {i+1}",
-                            indicator_names,
-                            key=f"entry_fast_{i}"
-                        )
-                    with col2:
-                        cond["slow_indicator"] = st.selectbox(
-                            f"Slow Indicator {i+1}",
-                            indicator_names,
-                            key=f"entry_slow_{i}"
-                        )
-                
-                elif cond_type == "threshold":
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        cond["indicator"] = st.selectbox(
-                            f"Indicator {i+1}",
-                            indicator_names,
-                            key=f"entry_thresh_ind_{i}"
-                        )
-                    with col2:
-                        cond["comparison"] = st.selectbox(
-                            f"Comparison {i+1}",
-                            ["above", "below", "above_or_equal", "below_or_equal"],
-                            key=f"entry_comp_{i}"
-                        )
-                    with col3:
-                        cond["value"] = st.number_input(
-                            f"Value {i+1}",
-                            value=50.0,
-                            key=f"entry_value_{i}"
-                        )
-                
-                if all(k in cond for k in ["type"]):
-                    entry_conditions.append(cond)
-        
+
+        # Directional Conditions (futures-friendly)
+        st.subheader("📈 Long Strategy Conditions")
+        long_entry_conditions = build_conditions_section(
+            section_title="Long Entry Conditions",
+            section_key="long_entry",
+            indicator_names=indicator_names,
+            default_count=1
+        )
+        long_exit_conditions = build_conditions_section(
+            section_title="Long Exit Conditions",
+            section_key="long_exit",
+            indicator_names=indicator_names,
+            default_count=1
+        )
+
         st.divider()
-        
-        # Exit Conditions
-        st.subheader("📉 Exit Conditions")
-        exit_conditions = []
-        num_exits = st.number_input("Number of Exit Conditions", min_value=1, max_value=3, value=1)
-        
-        for i in range(int(num_exits)):
-            with st.expander(f"Exit Condition {i+1}", expanded=(i==0)):
-                cond_type = st.selectbox(
-                    f"Exit Condition {i+1} Type",
-                    ["crossover", "crossunder", "threshold"],
-                    key=f"exit_cond_type_{i}"
-                )
-                
-                cond = {"type": cond_type}
-                
-                if cond_type == "crossover" or cond_type == "crossunder":
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        cond["fast_indicator"] = st.selectbox(
-                            f"Exit Fast Indicator {i+1}",
-                            indicator_names,
-                            key=f"exit_fast_{i}"
-                        )
-                    with col2:
-                        cond["slow_indicator"] = st.selectbox(
-                            f"Exit Slow Indicator {i+1}",
-                            indicator_names,
-                            key=f"exit_slow_{i}"
-                        )
-                
-                elif cond_type == "threshold":
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        cond["indicator"] = st.selectbox(
-                            f"Exit Indicator {i+1}",
-                            indicator_names,
-                            key=f"exit_thresh_ind_{i}"
-                        )
-                    with col2:
-                        cond["comparison"] = st.selectbox(
-                            f"Exit Comparison {i+1}",
-                            ["above", "below", "above_or_equal", "below_or_equal"],
-                            key=f"exit_comp_{i}"
-                        )
-                    with col3:
-                        cond["value"] = st.number_input(
-                            f"Exit Value {i+1}",
-                            value=50.0,
-                            key=f"exit_value_{i}"
-                        )
-                
-                if all(k in cond for k in ["type"]):
-                    exit_conditions.append(cond)
+
+        st.subheader("📉 Short Strategy Conditions")
+        short_entry_conditions = build_conditions_section(
+            section_title="Short Entry Conditions",
+            section_key="short_entry",
+            indicator_names=indicator_names,
+            default_count=0
+        )
+        short_exit_conditions = build_conditions_section(
+            section_title="Short Exit Conditions",
+            section_key="short_exit",
+            indicator_names=indicator_names,
+            default_count=0
+        )
         
         st.divider()
         
@@ -266,10 +259,6 @@ def show_create_strategy(manager):
                 st.error("Strategy name and symbol are required")
             elif not indicators:
                 st.error("At least one indicator is required")
-            elif not entry_conditions:
-                st.error("At least one entry condition is required")
-            elif not exit_conditions:
-                st.error("At least one exit condition is required")
             else:
                 try:
                     strategy = Strategy(
@@ -279,8 +268,10 @@ def show_create_strategy(manager):
                         end_date=end_date.isoformat(),
                         description=description,
                         indicators=indicators,
-                        entry_conditions=entry_conditions,
-                        exit_conditions=exit_conditions,
+                        long_entry_conditions=long_entry_conditions,
+                        long_exit_conditions=long_exit_conditions,
+                        short_entry_conditions=short_entry_conditions,
+                        short_exit_conditions=short_exit_conditions,
                         backtest_params={
                             "initial_capital": initial_capital,
                             "commission": commission
@@ -323,7 +314,9 @@ def show_load_strategy(manager):
             with col1:
                 if st.button("📊 Run Backtest", use_container_width=True):
                     st.session_state.selected_strategy = strategy_name
-                    st.switch_page("pages/results_viewer.py")
+                    st.session_state.current_page = "View Results"
+                    st.session_state.auto_run_backtest = True
+                    st.rerun()
             
             with col2:
                 if st.button("📋 View JSON", use_container_width=True):

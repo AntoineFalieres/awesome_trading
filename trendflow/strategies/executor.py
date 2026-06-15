@@ -77,9 +77,7 @@ class StrategyExecutor:
             # Generate signals
             print("Generating signals...")
             try:
-                self.data['signal'] = 0
-                self._apply_entry_conditions()
-                self._apply_exit_conditions()
+                self._generate_position_signals()
             except Exception as e:
                 raise StrategyExecutionError(f"Failed to generate signals: {e}")
 
@@ -155,19 +153,52 @@ class StrategyExecutor:
             else:
                 print(f"Warning: Unknown indicator type '{indicator_type}'")
 
-    def _apply_entry_conditions(self) -> None:
-        """Apply entry conditions to generate entry signals (1)."""
-        entry_signals = self._evaluate_conditions(self.strategy.entry_conditions, is_entry=True)
-        self.data.loc[entry_signals, 'signal'] = 1
+    def _generate_position_signals(self) -> None:
+        """
+        Generate directional position states:
+        - 1 for long
+        - 0 for flat
+        - -1 for short
+        """
+        long_entry_conditions = getattr(self.strategy, 'long_entry_conditions', self.strategy.entry_conditions)
+        long_exit_conditions = getattr(self.strategy, 'long_exit_conditions', self.strategy.exit_conditions)
+        short_entry_conditions = getattr(self.strategy, 'short_entry_conditions', [])
+        short_exit_conditions = getattr(self.strategy, 'short_exit_conditions', [])
 
-    def _apply_exit_conditions(self) -> None:
-        """Apply exit conditions to generate exit signals (0 or -1)."""
-        # Only apply exit signals where we're currently in a position
-        exit_signals = self._evaluate_conditions(self.strategy.exit_conditions, is_entry=False)
-        in_position = self.data['signal'].shift(1) == 1
-        self.data.loc[exit_signals & in_position, 'signal'] = 0
+        long_entry = self._evaluate_conditions(long_entry_conditions).fillna(False)
+        long_exit = self._evaluate_conditions(long_exit_conditions).fillna(False)
+        short_entry = self._evaluate_conditions(short_entry_conditions).fillna(False)
+        short_exit = self._evaluate_conditions(short_exit_conditions).fillna(False)
 
-    def _evaluate_conditions(self, conditions: list, is_entry: bool = True) -> pd.Series:
+        position = 0
+        signals = []
+        for idx in self.data.index:
+            long_entry_hit = bool(long_entry.loc[idx])
+            long_exit_hit = bool(long_exit.loc[idx])
+            short_entry_hit = bool(short_entry.loc[idx])
+            short_exit_hit = bool(short_exit.loc[idx])
+
+            if position == 0:
+                if long_entry_hit and not short_entry_hit:
+                    position = 1
+                elif short_entry_hit and not long_entry_hit:
+                    position = -1
+            elif position == 1:
+                if short_entry_hit:
+                    position = -1
+                elif long_exit_hit:
+                    position = 0
+            elif position == -1:
+                if long_entry_hit:
+                    position = 1
+                elif short_exit_hit:
+                    position = 0
+
+            signals.append(position)
+
+        self.data['signal'] = signals
+
+    def _evaluate_conditions(self, conditions: list) -> pd.Series:
         """
         Evaluate all conditions (AND logic - all must be true).
 
@@ -242,43 +273,54 @@ class StrategyExecutor:
 
     def _extract_trades(self) -> list:
         """
-        Extract individual trades from the equity curve.
+        Extract individual long/short trades from position-state signals.
 
         Returns:
             List of trade dictionaries
         """
         trades = []
-        in_trade = False
-        entry_idx = None
+        current_position = 0
         entry_price = None
         entry_date = None
+        entry_side = None
 
         for idx, row in self.data.iterrows():
-            # Entry signal
-            if row['signal'] == 1 and not in_trade:
-                in_trade = True
-                entry_idx = idx
-                entry_price = row['close']
+            next_position = int(row['signal'])
+            price = row['close']
+
+            if current_position == 0 and next_position != 0:
+                entry_price = price
                 entry_date = idx
+                entry_side = 'long' if next_position == 1 else 'short'
+                current_position = next_position
+                continue
 
-            # Exit signal
-            elif row['signal'] == 0 and in_trade:
-                exit_idx = idx
-                exit_price = row['close']
-                exit_date = idx
-                
-                pnl = exit_price - entry_price
-                pnl_pct = (pnl / entry_price) * 100
+            if current_position != 0 and next_position != current_position:
+                if current_position == 1:
+                    pnl = price - entry_price
+                else:
+                    pnl = entry_price - price
 
+                pnl_pct = (pnl / entry_price) * 100 if entry_price else 0.0
                 trades.append({
+                    'side': entry_side,
                     'entry_date': entry_date,
-                    'exit_date': exit_date,
+                    'exit_date': idx,
                     'entry_price': entry_price,
-                    'exit_price': exit_price,
+                    'exit_price': price,
                     'pnl': pnl,
                     'pnl_pct': pnl_pct
                 })
 
-                in_trade = False
+                if next_position == 0:
+                    current_position = 0
+                    entry_price = None
+                    entry_date = None
+                    entry_side = None
+                else:
+                    current_position = next_position
+                    entry_price = price
+                    entry_date = idx
+                    entry_side = 'long' if next_position == 1 else 'short'
 
         return trades

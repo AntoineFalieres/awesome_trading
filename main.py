@@ -30,11 +30,18 @@ st.markdown("""
 
 # Navigation in sidebar
 st.sidebar.title("🔗 Navigation")
+page_options = ["Home", "Strategy Editor", "View Results", "About"]
+if "current_page" not in st.session_state or st.session_state["current_page"] not in page_options:
+    st.session_state["current_page"] = "Home"
+
 page = st.sidebar.radio(
     "Select Page",
-    ["Home", "Strategy Editor", "View Results", "About"],
-    index=0
+    page_options,
+    index=page_options.index(st.session_state["current_page"])
 )
+
+if page != st.session_state["current_page"]:
+    st.session_state["current_page"] = page
 
 # Page routing
 if page == "Home":

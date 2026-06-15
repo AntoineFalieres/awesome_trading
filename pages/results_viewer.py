@@ -29,7 +29,8 @@ def show_results():
     with col2:
         run_backtest = st.button("▶️ Run Backtest", use_container_width=True)
     
-    if run_backtest or "backtest_results" in st.session_state:
+    auto_run = st.session_state.pop("auto_run_backtest", False)
+    if run_backtest or auto_run or "backtest_results" in st.session_state:
         if "backtest_results" not in st.session_state or st.session_state.get("current_strategy") != strategy_name:
             st.session_state.current_strategy = strategy_name
             

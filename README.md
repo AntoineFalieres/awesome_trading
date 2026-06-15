@@ -200,13 +200,19 @@ main.py                 # Main Streamlit app
 ## Strategy Configuration
 
 Strategies are stored as JSON files. See `trendflow/strategies/SCHEMA.md` for the complete schema.
+The `indicators` list can contain as many indicators as needed.
+For futures-style trading, define directional condition groups:
+- `long_entry_conditions` / `long_exit_conditions`
+- `short_entry_conditions` / `short_exit_conditions`
 
-### Example Strategy: MA Crossover
+Legacy `entry_conditions` and `exit_conditions` are still supported and map to the long side.
+
+### Example Strategy: Long + Short
 
 ```json
 {
-  "name": "Simple MA Crossover",
-  "description": "Buy when 10-day MA crosses above 30-day MA",
+  "name": "MA Futures Long Short",
+  "description": "Trade both trend breakouts and breakdowns",
   "symbol": "AAPL",
   "start_date": "2023-01-01",
   "end_date": "2024-01-01",
@@ -222,16 +228,30 @@ Strategies are stored as JSON files. See `trendflow/strategies/SCHEMA.md` for th
       "params": {"period": 30, "ma_type": "sma"}
     }
   ],
-  "entry_conditions": [
+  "long_entry_conditions": [
     {
       "type": "crossover",
       "fast_indicator": "sma_10",
       "slow_indicator": "sma_30"
     }
   ],
-  "exit_conditions": [
+  "long_exit_conditions": [
     {
       "type": "crossunder",
+      "fast_indicator": "sma_10",
+      "slow_indicator": "sma_30"
+    }
+  ],
+  "short_entry_conditions": [
+    {
+      "type": "crossunder",
+      "fast_indicator": "sma_10",
+      "slow_indicator": "sma_30"
+    }
+  ],
+  "short_exit_conditions": [
+    {
+      "type": "crossover",
       "fast_indicator": "sma_10",
       "slow_indicator": "sma_30"
     }

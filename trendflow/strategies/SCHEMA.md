@@ -1,17 +1,32 @@
 # Strategy Configuration Guide
 
 ## Overview
-A trading strategy in TrendFlow is defined as a JSON configuration that specifies:
+A trading strategy in TrendFlow is defined as JSON that specifies:
 1. Market data parameters (symbol, timeframe)
 2. Indicators to calculate
-3. Entry and exit conditions based on those indicators
+3. Directional rules for long and short positions
 
-## Strategy JSON Schema
+The `indicators` array supports as many entries as you need.
+
+## Directional condition fields
+
+- `long_entry_conditions`
+- `long_exit_conditions`
+- `short_entry_conditions`
+- `short_exit_conditions`
+
+Each condition array uses AND logic across entries.
+
+Legacy fields are still accepted for backward compatibility:
+- `entry_conditions` → treated as `long_entry_conditions`
+- `exit_conditions` → treated as `long_exit_conditions`
+
+## Strategy JSON Schema (directional)
 
 ```json
 {
-  "name": "Simple MA Crossover",
-  "description": "Buy when 10-day MA crosses above 30-day MA",
+  "name": "MA Futures Long Short",
+  "description": "Trade both long and short signals",
   "symbol": "AAPL",
   "start_date": "2023-01-01",
   "end_date": "2024-01-01",
@@ -19,30 +34,38 @@ A trading strategy in TrendFlow is defined as a JSON configuration that specifie
     {
       "name": "sma_10",
       "type": "moving_average",
-      "params": {
-        "period": 10,
-        "ma_type": "sma"
-      }
+      "params": {"period": 10, "ma_type": "sma"}
     },
     {
       "name": "sma_30",
       "type": "moving_average",
-      "params": {
-        "period": 30,
-        "ma_type": "sma"
-      }
+      "params": {"period": 30, "ma_type": "sma"}
     }
   ],
-  "entry_conditions": [
+  "long_entry_conditions": [
     {
       "type": "crossover",
       "fast_indicator": "sma_10",
       "slow_indicator": "sma_30"
     }
   ],
-  "exit_conditions": [
+  "long_exit_conditions": [
     {
       "type": "crossunder",
+      "fast_indicator": "sma_10",
+      "slow_indicator": "sma_30"
+    }
+  ],
+  "short_entry_conditions": [
+    {
+      "type": "crossunder",
+      "fast_indicator": "sma_10",
+      "slow_indicator": "sma_30"
+    }
+  ],
+  "short_exit_conditions": [
+    {
+      "type": "crossover",
       "fast_indicator": "sma_10",
       "slow_indicator": "sma_30"
     }
@@ -60,7 +83,7 @@ A trading strategy in TrendFlow is defined as a JSON configuration that specifie
 - **Type:** `moving_average`
 - **Params:**
   - `period` (int): Window size
-  - `ma_type` (str): 'sma', 'ema', or 'wma'
+  - `ma_type` (str): `sma`, `ema`, or `wma`
 
 ### Volume
 - **Type:** `volume`
@@ -82,27 +105,19 @@ A trading strategy in TrendFlow is defined as a JSON configuration that specifie
 ## Supported Conditions
 
 ### Crossover
-Entry/exit when fast indicator crosses above slow indicator.
+Fast indicator crosses above slow indicator.
 ```json
-{
-  "type": "crossover",
-  "fast_indicator": "sma_10",
-  "slow_indicator": "sma_30"
-}
+{"type": "crossover", "fast_indicator": "sma_10", "slow_indicator": "sma_30"}
 ```
 
 ### Crossunder
-Entry/exit when fast indicator crosses below slow indicator.
+Fast indicator crosses below slow indicator.
 ```json
-{
-  "type": "crossunder",
-  "fast_indicator": "sma_10",
-  "slow_indicator": "sma_30"
-}
+{"type": "crossunder", "fast_indicator": "sma_10", "slow_indicator": "sma_30"}
 ```
 
 ### Threshold
-Entry/exit when indicator exceeds a threshold.
+Indicator value compared to a threshold.
 ```json
 {
   "type": "threshold",
@@ -112,62 +127,4 @@ Entry/exit when indicator exceeds a threshold.
 }
 ```
 
-### Multiple Conditions
-All conditions must be True (AND logic).
-```json
-"entry_conditions": [
-  {
-    "type": "crossover",
-    "fast_indicator": "sma_10",
-    "slow_indicator": "sma_30"
-  },
-  {
-    "type": "threshold",
-    "indicator": "rsi_14",
-    "comparison": "below",
-    "value": 80
-  }
-]
-```
-
-## Example Strategies
-
-### Multi-Indicator Strategy
-```json
-{
-  "name": "MA + RSI Strategy",
-  "description": "Buy on MA crossover if RSI < 70, sell if RSI > 30 or MA crossunder",
-  "symbol": "BTC-USD",
-  "start_date": "2023-06-01",
-  "end_date": "2024-06-01",
-  "indicators": [
-    {
-      "name": "sma_20",
-      "type": "moving_average",
-      "params": {"period": 20, "ma_type": "sma"}
-    },
-    {
-      "name": "sma_50",
-      "type": "moving_average",
-      "params": {"period": 50, "ma_type": "sma"}
-    },
-    {
-      "name": "rsi_14",
-      "type": "rsi",
-      "params": {"period": 14}
-    }
-  ],
-  "entry_conditions": [
-    {"type": "crossover", "fast_indicator": "sma_20", "slow_indicator": "sma_50"},
-    {"type": "threshold", "indicator": "rsi_14", "comparison": "below", "value": 70}
-  ],
-  "exit_conditions": [
-    {"type": "crossunder", "fast_indicator": "sma_20", "slow_indicator": "sma_50"},
-    {"type": "threshold", "indicator": "rsi_14", "comparison": "above", "value": 80}
-  ],
-  "backtest_params": {
-    "initial_capital": 10000,
-    "commission": 0.001
-  }
-}
-```
+Comparisons: `above`, `below`, `above_or_equal`, `below_or_equal`
