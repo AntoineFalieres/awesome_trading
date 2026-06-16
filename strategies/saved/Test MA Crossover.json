@@ -1,0 +1,43 @@
+{
+  "name": "Test MA Crossover",
+  "symbol": "AAPL",
+  "start_date": "2023-01-01",
+  "end_date": "2023-12-31",
+  "description": "Simple moving average crossover strategy",
+  "indicators": [
+    {
+      "name": "sma_10",
+      "type": "moving_average",
+      "params": {
+        "period": 10,
+        "ma_type": "sma"
+      }
+    },
+    {
+      "name": "sma_30",
+      "type": "moving_average",
+      "params": {
+        "period": 30,
+        "ma_type": "sma"
+      }
+    }
+  ],
+  "entry_conditions": [
+    {
+      "type": "crossover",
+      "fast_indicator": "sma_10",
+      "slow_indicator": "sma_30"
+    }
+  ],
+  "exit_conditions": [
+    {
+      "type": "crossunder",
+      "fast_indicator": "sma_10",
+      "slow_indicator": "sma_30"
+    }
+  ],
+  "backtest_params": {
+    "initial_capital": 10000,
+    "commission": 0.001
+  }
+}
